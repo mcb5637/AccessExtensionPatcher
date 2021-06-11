@@ -164,6 +164,44 @@ namespace AccessExtension
             if (p.Zip(t, (pi, ti) => pi.ParameterType.Equals(ti)).Contains(false))
                 throw new ArgumentException("parameter type mismatch");
         }
+
+        public static Assembly GetLoadedAssemblybyName(string name)
+        {
+            return AppDomain.CurrentDomain.GetAssemblies().Where((a) => name.Equals(a.GetName().Name)).FirstOrDefault();
+        }
+
+        /// <summary>
+        /// searches all loades assemblies for a matching static method and generates an delegate to it.
+        /// </summary>
+        /// <typeparam name="T">type of delegate</typeparam>
+        /// <param name="assembly">assembly (dll) filename</param>
+        /// <param name="type">fully qualified type name (namespace.Typename)</param>
+        /// <param name="method">method name</param>
+        /// <param name="del">reference to delegate variable. only written if something found</param>
+        /// <param name="pred">optional predicate to filter methods</param>
+        /// <param name="op">optional transform the selected method (example: instanciate a generic with MakeGenericMethod</param>
+        /// <returns>true, if delegate was created successfully</returns>
+        public static bool GetDelegateFromAssembly<T>(string assembly, string type, string method, ref T del, Func<MethodInfo, bool> pred = null, Func<MethodInfo, Assembly, MethodInfo> op = null) where T : Delegate
+        {
+            return GetDelegateFromAssembly(GetLoadedAssemblybyName(assembly), type, method, ref del, pred, op);
+        }
+        public static bool GetDelegateFromAssembly<T>(Assembly a, string type, string method, ref T del, Func<MethodInfo, bool> pred = null, Func<MethodInfo, Assembly, MethodInfo> op = null) where T : Delegate
+        {
+            if (a == null)
+                return false;
+            if (pred == null)
+                pred = (_) => true;
+            if (op == null)
+                op = (i, _) => i;
+            Type t = a.GetType(type);
+            if (t != null)
+            {
+                MethodInfo m = op(t.GetMethods().Where((i) => i.Name.Equals(method)).Single(pred), a); // throws if more than one found
+                del = (T)Delegate.CreateDelegate(typeof(T), m);
+                return true;
+            }
+            return false;
+        }
     }
 
     public class FieldGet : Attribute
