@@ -202,6 +202,55 @@ namespace AccessExtension
             }
             return false;
         }
+
+        public static Type GenerateType(string name, Type baseClass, Type[] interfaces, IEnumerable<CustomAttributeBuilder> attributes)
+        {
+            AssemblyName aname = new AssemblyName(name);
+            AssemblyBuilder assemblyBuilder = AppDomain.CurrentDomain.DefineDynamicAssembly(aname, AssemblyBuilderAccess.Run);
+            ModuleBuilder moduleBuilder = assemblyBuilder.DefineDynamicModule("MainModule");
+            TypeBuilder typeBuilder = moduleBuilder.DefineType(aname.FullName, TypeAttributes.Public | TypeAttributes.Class, baseClass, interfaces);
+            typeBuilder.DefineDefaultConstructor(MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.RTSpecialName);
+
+            foreach (Type t in interfaces)
+            {
+                foreach (PropertyInfo p in t.GetProperties())
+                {
+                    TypeGenerateProperty(typeBuilder, p.Name, p.PropertyType, p);
+                }
+            }
+
+            foreach (CustomAttributeBuilder at in attributes)
+                typeBuilder.SetCustomAttribute(at);
+
+            return typeBuilder.CreateType();
+        }
+
+        private static void TypeGenerateProperty(TypeBuilder typeBuilder, string name, Type ty, PropertyInfo over=null)
+        {
+            FieldBuilder field = typeBuilder.DefineField("_" + name, ty, FieldAttributes.Private);
+            PropertyBuilder prop = typeBuilder.DefineProperty(name, PropertyAttributes.HasDefault, ty, null);
+            MethodAttributes att = MethodAttributes.Public | MethodAttributes.HideBySig | MethodAttributes.SpecialName;
+            if (over != null)
+                att |= MethodAttributes.Virtual;
+            MethodBuilder getbuild = typeBuilder.DefineMethod("get_"+name, att, ty, Type.EmptyTypes);
+            ILGenerator getil = getbuild.GetILGenerator();
+            getil.Emit(OpCodes.Ldarg_0);
+            getil.Emit(OpCodes.Ldfld, field);
+            getil.Emit(OpCodes.Ret);
+            MethodBuilder setbuild = typeBuilder.DefineMethod("set_"+name, att, null, new Type[] { ty });
+            ILGenerator setil = setbuild.GetILGenerator();
+            setil.Emit(OpCodes.Ldarg_0);
+            setil.Emit(OpCodes.Ldarg_1);
+            setil.Emit(OpCodes.Stfld, field);
+            setil.Emit(OpCodes.Ret);
+            prop.SetGetMethod(getbuild);
+            prop.SetSetMethod(setbuild);
+            if (over != null)
+            {
+                typeBuilder.DefineMethodOverride(getbuild, over.GetGetMethod());
+                typeBuilder.DefineMethodOverride(setbuild, over.GetSetMethod());
+            }
+        }
     }
 
     public class FieldGet : Attribute
