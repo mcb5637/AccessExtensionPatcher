@@ -180,15 +180,19 @@ namespace AccessExtension
         /// <param name="del">reference to delegate variable. only written if something found</param>
         /// <param name="pred">optional predicate to filter methods</param>
         /// <param name="op">optional transform the selected method (example: instanciate a generic with MakeGenericMethod</param>
+        /// <param name="log">optional gets called with a logging string</param>
         /// <returns>true, if delegate was created successfully</returns>
-        public static bool GetDelegateFromAssembly<T>(string assembly, string type, string method, ref T del, Func<MethodInfo, bool> pred = null, Func<MethodInfo, Assembly, MethodInfo> op = null) where T : Delegate
+        public static bool GetDelegateFromAssembly<T>(string assembly, string type, string method, ref T del, Func<MethodInfo, bool> pred = null, Func<MethodInfo, Assembly, MethodInfo> op = null, Action<string> log = null) where T : Delegate
         {
-            return GetDelegateFromAssembly(GetLoadedAssemblybyName(assembly), type, method, ref del, pred, op);
+            return GetDelegateFromAssembly(GetLoadedAssemblybyName(assembly), type, method, ref del, pred, op, log);
         }
-        public static bool GetDelegateFromAssembly<T>(Assembly a, string type, string method, ref T del, Func<MethodInfo, bool> pred = null, Func<MethodInfo, Assembly, MethodInfo> op = null) where T : Delegate
+        public static bool GetDelegateFromAssembly<T>(Assembly a, string type, string method, ref T del, Func<MethodInfo, bool> pred = null, Func<MethodInfo, Assembly, MethodInfo> op = null, Action<string> log = null) where T : Delegate
         {
             if (a == null)
+            {
+                log?.Invoke("AEP: Assembly null");
                 return false;
+            }
             if (pred == null)
                 pred = (_) => true;
             if (op == null)
@@ -198,9 +202,24 @@ namespace AccessExtension
             {
                 MethodInfo m = op(t.GetMethods().Where((i) => i.Name.Equals(method)).Single(pred), a); // throws if more than one found
                 del = (T)Delegate.CreateDelegate(typeof(T), m);
+                log?.Invoke("AEP: delegate bound to " + m.FullName());
                 return true;
             }
+            log?.Invoke($"AEP: Type {type} not found in Assembly");
             return false;
+        }
+
+        public static string FullName(this MethodInfo m)
+        {
+            string r = m.ReturnType.FullName + " " + m.DeclaringType.FullName;
+            r += "." + m.Name;
+            Type[] gens = m.GetGenericArguments();
+            if (gens != null && gens.Length > 0)
+            {
+                r += "<" + string.Join(", ", gens.Select((t) => t.FullName)) + ">";
+            }
+            r += "(" + string.Join(", ", m.GetParameters().Select(o => string.Format("{0} {1}", o.ParameterType, o.Name)).ToArray()) + ")";
+            return r;
         }
 
         public static Type GenerateType(string name, Type baseClass, Type[] interfaces, IEnumerable<CustomAttributeBuilder> attributes)
