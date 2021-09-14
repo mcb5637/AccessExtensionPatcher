@@ -270,6 +270,40 @@ namespace AccessExtension
                 typeBuilder.DefineMethodOverride(setbuild, over.GetSetMethod());
             }
         }
+
+        public static T GenerateCastAndCall<T>(MethodInfo i) where T : Delegate
+        {
+            MethodInfo tm = typeof(T).GetMethod("Invoke");
+            Type[] iparams;
+            if (i.IsStatic)
+                iparams = i.GetParameters().Select((p) => p.ParameterType).ToArray();
+            else
+                iparams = i.GetParameters().Select((p) => p.ParameterType).ToArray().Prepend(i.DeclaringType).ToArray();
+           Type[] tmparams = tm.GetParameters().Select((p) => p.ParameterType).ToArray();
+            int count = iparams.Count();
+            if (count != tmparams.Count())
+                throw new ArgumentException("parameter count mismatch");
+            Type obj = typeof(object);
+            for (int j=0; j < count; j++)
+            {
+                if (tmparams[j] != obj && tmparams[j] != iparams[j])
+                    throw new ArgumentException("parameter type mismatch " + i);
+            }
+            if (!(tm.ReturnType == obj && i.ReturnType != typeof(void)) && i.ReturnType != tm.ReturnType)
+                throw new ArgumentException("return type mismatch");
+
+            DynamicMethod dm = new DynamicMethod(i.Name+"_CastAndCall", tm.ReturnType, tmparams);
+            ILGenerator g = dm.GetILGenerator();
+            for (int j = 0; j < count; j++)
+            {
+                g.Emit(OpCodes.Ldarg, j);
+                if (tmparams[j] != iparams[j])
+                    g.Emit(OpCodes.Castclass, iparams[j]);
+            }
+            g.Emit(OpCodes.Call, i);
+            g.Emit(OpCodes.Ret);
+            return (T)dm.CreateDelegate(typeof(T));
+        }
     }
 
     public class FieldGet : Attribute
