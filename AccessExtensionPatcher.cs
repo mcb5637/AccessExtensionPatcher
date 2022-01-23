@@ -209,16 +209,21 @@ namespace AccessExtension
             return false;
         }
 
-        public static string FullName(this MethodInfo m)
+        public static string FullName(this MethodBase m)
         {
-            string r = m.ReturnType.FullName + " " + m.DeclaringType.FullName;
+            string r;
+            if (m is MethodInfo mi)
+                r = mi.ReturnType.FullName;
+            else
+                r = "UnknownReturn";
+            r += " " + m.DeclaringType.FullName;
             r += "." + m.Name;
             Type[] gens = m.GetGenericArguments();
             if (gens != null && gens.Length > 0)
             {
                 r += "<" + string.Join(", ", gens.Select((t) => t.FullName)) + ">";
             }
-            r += "(" + string.Join(", ", m.GetParameters().Select(o => string.Format("{0} {1}", o.ParameterType, o.Name)).ToArray()) + ")";
+            r += "(" + string.Join(", ", m.GetParameters().Select(o => $"{o.ParameterType} {o.Name}")) + ")";
             return r;
         }
 
