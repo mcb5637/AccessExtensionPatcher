@@ -57,7 +57,7 @@ namespace AccessExtension
         public static void PatchMethodCall(HarmonyInstance h, MethodBase m, MethodInfo target = null)
         {
             if (target != null)
-                PatchMethodInfo.Add(m, new MethodCall(target, target.ReturnType));
+                PatchMethodInfo.Add(m, new MethodCall(target));
             h.Patch(m, null, null, new HarmonyMethod(AccessTools.Method(typeof(AccessExtensionPatcher), nameof(TransMethodCall))));
         }
 
@@ -81,7 +81,7 @@ namespace AccessExtension
         private static IEnumerable<CodeInstruction> TransFieldGet(IEnumerable<CodeInstruction> c, MethodBase method)
         {
             
-            FieldInfo field = PatchFieldInfo.TryGetValue(method, out FieldInfo o) ? o : method.GetCustomAttribute<FieldGet>().i;
+            FieldInfo field = PatchFieldInfo.TryGetValue(method, out FieldInfo o) ? o : method.GetCustomAttribute<FieldGet>().Field;
             if (field.IsStatic)
             {
                 CheckParamTypes(method, field.FieldType);
@@ -98,7 +98,7 @@ namespace AccessExtension
         }
         private static IEnumerable<CodeInstruction> TransFieldSet(IEnumerable<CodeInstruction> c, MethodBase method)
         {
-            FieldInfo field = PatchFieldInfo.TryGetValue(method, out FieldInfo o) ? o : method.GetCustomAttribute<FieldSet>().i;
+            FieldInfo field = PatchFieldInfo.TryGetValue(method, out FieldInfo o) ? o : method.GetCustomAttribute<FieldSet>().Field;
             if (field.IsStatic)
             {
                 CheckParamTypes(method, typeof(void), field.FieldType);
@@ -118,8 +118,8 @@ namespace AccessExtension
         private static IEnumerable<CodeInstruction> TransMethodCall(IEnumerable<CodeInstruction> c, MethodBase method)
         {
             MethodCall mcall = PatchMethodInfo.TryGetValue(method, out MethodCall o) ? o : method.GetCustomAttribute<MethodCall>();
-            MethodBase i = mcall.i;
-            Type r = mcall.ret;
+            MethodInfo i = mcall.Method;
+            Type r = i.ReturnType;
             if (i.IsStatic)
             {
                 CheckParamTypes(method, r, i.GetParameters().Length, i.GetParameters().Select((p) => p.ParameterType));
@@ -139,7 +139,7 @@ namespace AccessExtension
         }
         private static IEnumerable<CodeInstruction> TransConstructorCall(IEnumerable<CodeInstruction> c, MethodBase method)
         {
-            ConstructorInfo i = PatchConstructorInfo.TryGetValue(method, out ConstructorInfo o) ? o : method.GetCustomAttribute<ConstructorCall>().i;
+            ConstructorInfo i = PatchConstructorInfo.TryGetValue(method, out ConstructorInfo o) ? o : method.GetCustomAttribute<ConstructorCall>().Constructor;
             CheckParamTypes(method, i.DeclaringType, i.GetParameters().Length, i.GetParameters().Select((p) => p.ParameterType));
             for (int j = 0; j < i.GetParameters().Length; j++)
                 yield return new CodeInstruction(OpCodes.Ldarg, j);
@@ -165,7 +165,7 @@ namespace AccessExtension
                 throw new ArgumentException("parameter type mismatch");
         }
 
-        public static Assembly GetLoadedAssemblybyName(string name)
+        public static Assembly GetLoadedAssemblyByName(string name)
         {
             return AppDomain.CurrentDomain.GetAssemblies().Where((a) => name.Equals(a.GetName().Name)).FirstOrDefault();
         }
@@ -184,7 +184,7 @@ namespace AccessExtension
         /// <returns>true, if delegate was created successfully</returns>
         public static bool GetDelegateFromAssembly<T>(string assembly, string type, string method, ref T del, Func<MethodInfo, bool> pred = null, Func<MethodInfo, Assembly, MethodInfo> op = null, Action<string> log = null) where T : Delegate
         {
-            return GetDelegateFromAssembly(GetLoadedAssemblybyName(assembly), type, method, ref del, pred, op, log);
+            return GetDelegateFromAssembly(GetLoadedAssemblyByName(assembly), type, method, ref del, pred, op, log);
         }
         public static bool GetDelegateFromAssembly<T>(Assembly a, string type, string method, ref T del, Func<MethodInfo, bool> pred = null, Func<MethodInfo, Assembly, MethodInfo> op = null, Action<string> log = null) where T : Delegate
         {
@@ -308,89 +308,6 @@ namespace AccessExtension
             g.Emit(OpCodes.Call, i);
             g.Emit(OpCodes.Ret);
             return (T)dm.CreateDelegate(typeof(T));
-        }
-    }
-
-    public class FieldGet : Attribute
-    {
-        internal FieldInfo i;
-
-        public FieldGet(FieldInfo i)
-        {
-            this.i = i;
-        }
-
-        public FieldGet(Type t, string f)
-        {
-            i = AccessTools.Field(t, f);
-        }
-    }
-    public class FieldSet : Attribute
-    {
-        internal FieldInfo i;
-
-        public FieldSet(FieldInfo i)
-        {
-            this.i = i;
-        }
-
-        public FieldSet(Type t, string f)
-        {
-            i = AccessTools.Field(t, f);
-        }
-    }
-    public class MethodCall : Attribute
-    {
-        internal MethodBase i;
-        internal Type ret;
-
-        public MethodCall(MethodBase i, Type ret)
-        {
-            this.i = i;
-            this.ret = ret;
-        }
-
-        internal MethodCall()
-        {
-        }
-
-        public MethodCall(Type t, string m, Type[] p = null)
-        {
-            MethodInfo inf = AccessTools.Method(t, m, p);
-            i = inf;
-            ret = inf.ReturnType;
-        }
-    }
-    public class PropertyGet : MethodCall
-    {
-        public PropertyGet(Type t, string m)
-        {
-            PropertyInfo p = AccessTools.Property(t, m);
-            i = p.GetMethod;
-            ret = p.PropertyType;
-        }
-    }
-    public class PropertySet : MethodCall
-    {
-        public PropertySet(Type t, string m)
-        {
-            PropertyInfo p = AccessTools.Property(t, m);
-            i = p.SetMethod;
-            ret = typeof(void);
-        }
-    }
-    public class ConstructorCall : Attribute
-    {
-        internal ConstructorInfo i;
-
-        public ConstructorCall(ConstructorInfo i)
-        {
-            this.i = i;
-        }
-
-        public ConstructorCall(Type t, Type[] p = null)
-        {
-            i = AccessTools.Constructor(t, p);
         }
     }
 }
