@@ -200,7 +200,12 @@ namespace AccessExtension
             Type t = a.GetType(type);
             if (t != null)
             {
-                MethodInfo m = op(t.GetMethods().Where((i) => i.Name.Equals(method)).Single(pred), a); // throws if more than one found
+                MethodInfo m = op(t.GetMethods().Where((i) => i.Name.Equals(method)).SingleOrDefault(pred), a); // throws if more than one found
+                if (m == null)
+                {
+                    log?.Invoke($"AEP: no method {method} found in {type} that satisfies all conditions");
+                    return false;
+                }
                 del = (T)Delegate.CreateDelegate(typeof(T), m);
                 log?.Invoke("AEP: delegate bound to " + m.FullName());
                 return true;
