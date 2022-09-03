@@ -223,7 +223,15 @@ namespace AccessExtension
                 r = "UnknownReturn";
             r += " " + m.DeclaringType.FullName;
             r += "." + m.Name;
-            Type[] gens = m.GetGenericArguments();
+            Type[] gens;
+            try
+            {
+                gens = m.GetGenericArguments();
+            }
+            catch (NotSupportedException)
+            {
+                gens = null;
+            }
             if (gens != null && gens.Length > 0)
             {
                 r += "<" + string.Join(", ", gens.Select((t) => t.FullName)) + ">";
@@ -313,6 +321,96 @@ namespace AccessExtension
             g.Emit(OpCodes.Call, i);
             g.Emit(OpCodes.Ret);
             return (T)dm.CreateDelegate(typeof(T));
+        }
+
+        private class Comparator : IEqualityComparer<CodeInstruction>
+        {
+            public bool Equals(CodeInstruction x, CodeInstruction y)
+            {
+                return x.opcode == y.opcode && x.operand.Equals(y.operand);
+            }
+
+            public int GetHashCode(CodeInstruction obj)
+            {
+                return obj.opcode.GetHashCode() ^ obj.operand.GetHashCode();
+            }
+        }
+        /// <summary>
+        /// tool to insert code for a harmony transpiler.
+        /// compares the last compare.Length instructions with compare, if equals, calls onfound and inserts its return.
+        /// then continues searching.
+        /// you may modify the pref LinkedList that onfound gets as parameter.
+        /// if you do not want the matched code to be emitted again after the insertion, clear the prev LinkedList.
+        /// if you want to modify the matched code, return the modified code and clear the prev LinkedList.
+        /// if you want to search your emitted code again, only modify the prev LinkedList and return an empty enumeration.
+        /// you may not increase the size of the prev LinkedList to > compare.Length.
+        /// </summary>
+        /// <param name="code">input code</param>
+        /// <param name="compare">code to search for</param>
+        /// <param name="onfound">called when compare found</param>
+        /// <param name="dump">print all instructions to FileLog.Log</param>
+        /// <returns></returns>
+        public static IEnumerable<CodeInstruction> TranspilerHelper(IEnumerable<CodeInstruction> code, CodeInstruction[] compare, Func<LinkedList<CodeInstruction>, IEnumerable<CodeInstruction>> onfound, bool dump = false)
+        {
+            if (dump)
+                FileLog.Log("TranspilerHelper starting");
+            LinkedList<CodeInstruction> prev = new LinkedList<CodeInstruction>();
+            Comparator cmptor = new Comparator();
+            foreach (CodeInstruction c in code)
+            {
+                prev.AddLast(c);
+                if (prev.Count == compare.Length)
+                {
+                    if (prev.SequenceEqual(compare, cmptor))
+                    {
+                        if (dump)
+                        {
+                            FileLog.Log("found");
+                            foreach (CodeInstruction p in prev)
+                                Dump(p);
+                            FileLog.Log("replacement");
+                        }
+                        foreach (CodeInstruction t in onfound(prev))
+                        {
+                            Dump(t);
+                            yield return t;
+                        }
+                        if (dump)
+                            FileLog.Log("end found");
+                    }
+                }
+
+                if (prev.Count == compare.Length)
+                {
+                    Dump(prev.First.Value);
+                    yield return prev.First.Value;
+                    prev.RemoveFirst();
+                }
+            }
+            while (prev.Count > 0)
+            {
+                Dump(prev.First.Value);
+                yield return prev.First.Value;
+                prev.RemoveFirst();
+            }
+            if (dump)
+                FileLog.Log("TranspilerHelper done");
+
+            void Dump(CodeInstruction c)
+            {
+                if (!dump)
+                    return;
+                string op;
+                if (c.operand == null)
+                    op = "null";
+                else if (c.operand is MethodBase minf)
+                    op = minf.FullName();
+                else if (c.operand is FieldInfo finf)
+                    op = finf.FieldType.FullName + " " + finf.DeclaringType.FullName + "." + finf.Name;
+                else
+                    op = c.operand.ToString();
+                FileLog.Log($"{c.opcode}: [{(c.operand != null ? c.operand.GetType().FullName : "null")}] {op}");
+            }
         }
     }
 }
