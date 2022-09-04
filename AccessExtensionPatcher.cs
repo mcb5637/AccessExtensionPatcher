@@ -409,7 +409,10 @@ namespace AccessExtension
                     op = finf.FieldType.FullName + " " + finf.DeclaringType.FullName + "." + finf.Name;
                 else
                     op = c.operand.ToString();
-                FileLog.Log($"{c.opcode}: [{(c.operand != null ? c.operand.GetType().FullName : "null")}] {op}");
+                string lbls = "none";
+                if (c.labels.Count > 0)
+                    lbls = c.labels.Select((a) => a.ToString()).Aggregate((a, b) => a + "," + b);
+                FileLog.Log($"{c.opcode}: [{(c.operand != null ? c.operand.GetType().FullName : "null")}] {op}, {lbls}");
             }
         }
     }
