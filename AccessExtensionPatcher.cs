@@ -327,12 +327,21 @@ namespace AccessExtension
         {
             public bool Equals(CodeInstruction x, CodeInstruction y)
             {
-                return x.opcode == y.opcode && x.operand.Equals(y.operand);
+                if (x.opcode != y.opcode)
+                    return false;
+                if (x.operand == null)
+                    return y.operand == null;
+                if (y.operand == null)
+                    return x.operand == null;
+                return x.operand.Equals(y.operand);
             }
 
             public int GetHashCode(CodeInstruction obj)
             {
-                return obj.opcode.GetHashCode() ^ obj.operand.GetHashCode();
+                int h = obj.opcode.GetHashCode();
+                if (obj.operand != null)
+                    h ^= obj.operand.GetHashCode();
+                return h;
             }
         }
         /// <summary>
