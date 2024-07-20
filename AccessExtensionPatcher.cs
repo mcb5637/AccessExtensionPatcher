@@ -1,4 +1,4 @@
-﻿using HarmonyLib;
+﻿using Harmony;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,7 +15,7 @@ namespace AccessExtension
         private static readonly Dictionary<MethodBase, MethodCall> PatchMethodInfo = new Dictionary<MethodBase, MethodCall>();
         private static readonly Dictionary<MethodBase, ConstructorInfo> PatchConstructorInfo = new Dictionary<MethodBase, ConstructorInfo>();
 
-        public static void PatchAll(Harmony h, Assembly a)
+        public static void PatchAll(HarmonyInstance h, Assembly a)
         {
             foreach (Type t in a.GetTypes())
             {
@@ -41,37 +41,37 @@ namespace AccessExtension
             }
         }
 
-        public static void PatchFieldGet(Harmony h, MethodBase m, FieldInfo f = null)
+        public static void PatchFieldGet(HarmonyInstance h, MethodBase m, FieldInfo f = null)
         {
             if (f != null)
                 PatchFieldInfo.Add(m, f);
             h.Patch(m, null, null, new HarmonyMethod(AccessTools.Method(typeof(AccessExtensionPatcher), nameof(TransFieldGet))));
         }
-        public static void PatchFieldSet(Harmony h, MethodBase m, FieldInfo f = null)
+        public static void PatchFieldSet(HarmonyInstance h, MethodBase m, FieldInfo f = null)
         {
             if (f != null)
                 PatchFieldInfo.Add(m, f);
             h.Patch(m, null, null, new HarmonyMethod(AccessTools.Method(typeof(AccessExtensionPatcher), nameof(TransFieldSet))));
         }
 
-        public static void PatchMethodCall(Harmony h, MethodBase m, MethodInfo target = null)
+        public static void PatchMethodCall(HarmonyInstance h, MethodBase m, MethodInfo target = null)
         {
             if (target != null)
                 PatchMethodInfo.Add(m, new MethodCall(target));
             h.Patch(m, null, null, new HarmonyMethod(AccessTools.Method(typeof(AccessExtensionPatcher), nameof(TransMethodCall))));
         }
 
-        public static void PatchPropertyGet(Harmony h, MethodBase m, PropertyInfo p)
+        public static void PatchPropertyGet(HarmonyInstance h, MethodBase m, PropertyInfo p)
         {
             PatchMethodCall(h, m, p.GetMethod);
         }
 
-        public static void PatchPropertySet(Harmony h, MethodBase m, PropertyInfo p)
+        public static void PatchPropertySet(HarmonyInstance h, MethodBase m, PropertyInfo p)
         {
             PatchMethodCall(h, m, p.SetMethod);
         }
 
-        public static void PatchConstructorCall(Harmony h, MethodBase m, ConstructorInfo c = null)
+        public static void PatchConstructorCall(HarmonyInstance h, MethodBase m, ConstructorInfo c = null)
         {
             if (c != null)
                 PatchConstructorInfo.Add(m, c);
