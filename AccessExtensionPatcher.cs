@@ -19,7 +19,7 @@ namespace AccessExtension
         {
             foreach (Type t in a.GetTypes())
             {
-                foreach (MethodBase m in t.GetMethods())
+                foreach (MethodBase m in t.GetMethods(BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
                 {
                     if (m.GetCustomAttribute<FieldGet>() != null)
                     {
